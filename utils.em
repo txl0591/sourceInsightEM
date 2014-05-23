@@ -287,6 +287,404 @@ macro GetWordFromString(hbuf,szLine,nBeg,nEnd,chBeg,chSeparator,chEnd)
 }
 
 /*************************************************
+  Function: 	SkipCommentFromString
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro SkipCommentFromString(szLine,isCommentEnd)
+{
+    RetVal = ""
+    fIsEnd = 1
+    nLen = strlen(szLine)
+    nIdx = 0
+    while(nIdx < nLen)
+    {
+        if( (isCommentEnd == 0) || (szLine[nIdx] == "/" && szLine[nIdx+1] == "*"))
+        {
+            fIsEnd = 0
+            while(nIdx < nLen )
+            {
+                if(szLine[nIdx] == "*" && szLine[nIdx+1] == "/")
+                {
+                    szLine[nIdx+1] = " "
+                    szLine[nIdx] = " " 
+                    nIdx = nIdx + 1 
+                    fIsEnd  = 1
+                    isCommentEnd = 1
+                    break
+                }
+                szLine[nIdx] = " "
+                nIdx = nIdx + 1 
+            }    
+            
+            if(nIdx == nLen)
+            {
+                break
+            }
+        }
+        
+        if(szLine[nIdx] == "/" && szLine[nIdx+1] == "/")
+        {
+            szLine = strmid(szLine,0,nIdx)
+            break
+        }
+        nIdx = nIdx + 1                
+    }
+    RetVal.szContent = szLine;
+    RetVal.fIsEnd = fIsEnd
+    return RetVal
+}
+
+/*************************************************
+  Function: 	TrimLeft
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro TrimLeft(szLine)
+{
+    nLen = strlen(szLine)
+    if(nLen == 0)
+    {
+        return szLine
+    }
+    nIdx = 0
+    while( nIdx < nLen )
+    {
+        if( ( szLine[nIdx] != " ") && (szLine[nIdx] != "\t") )
+        {
+            break
+        }
+        nIdx = nIdx + 1
+    }
+    return strmid(szLine,nIdx,nLen)
+}
+
+/*************************************************
+  Function: 	TrimRight
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro TrimRight(szLine)
+{
+    nLen = strlen(szLine)
+    if(nLen == 0)
+    {
+        return szLine
+    }
+    nIdx = nLen
+    while( nIdx > 0 )
+    {
+        nIdx = nIdx - 1
+        if( ( szLine[nIdx] != " ") && (szLine[nIdx] != "\t") )
+        {
+            break
+        }
+    }
+    return strmid(szLine,0,nIdx+1)
+}
+
+/*************************************************
+  Function: 	TrimString
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro TrimString(szLine)
+{
+    szLine = TrimLeft(szLine)
+    szLIne = TrimRight(szLine)
+    return szLine
+}
+
+/*************************************************
+  Function: 	GetFirstWord
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro GetFirstWord(szLine)
+{
+    szLine = TrimLeft(szLine)
+    nIdx = 0
+    iLen = strlen(szLine)
+    while(nIdx < iLen)
+    {
+        if( (szLine[nIdx] == " ") || (szLine[nIdx] == "\t") 
+          || (szLine[nIdx] == ";") || (szLine[nIdx] == "(")
+          || (szLine[nIdx] == ".") || (szLine[nIdx] == "{")
+          || (szLine[nIdx] == ",") || (szLine[nIdx] == ":") )
+        {
+            return strmid(szLine,0,nIdx)
+        }
+        nIdx = nIdx + 1
+    }
+    return ""
+}
+
+/*************************************************
+  Function: 	SearchForward
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro SearchForward()
+{
+    LoadSearchPattern("#", 1, 0, 1);
+    Search_Forward
+}
+
+/*************************************************
+  Function: 	SearchBackward
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro SearchBackward()
+{
+    LoadSearchPattern("#", 1, 0, 1);
+    Search_Backward
+}
+
+/*************************************************
+  Function: 	ExpandBraceLarge
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro ExpandBraceLarge()
+{
+    hwnd = GetCurrentWnd()
+    sel = GetWndSel(hwnd)
+    hbuf = GetCurrentBuf()
+    ln = sel.lnFirst
+    nlineCount = 0
+    retVal = ""
+    szLine = GetBufLine( hbuf, ln ) 
+
+    nLeft = GetLeftBlank(szLine)
+    szLeft = strmid(szLine,0,nLeft);
+
+    if(sel.lnFirst == sel.lnLast && sel.ichFirst == sel.ichLim)
+    {
+        if( nLeft == strlen(szLine) )
+        {
+            SetBufSelText (hbuf, "{")
+        }
+        else
+        {    
+            ln = ln + 1        
+            InsBufLine(hbuf, ln, "@szLeft@{")     
+            nlineCount = nlineCount + 1
+
+        }
+        InsBufLine(hbuf, ln + 1, "@szLeft@    ")
+        InsBufLine(hbuf, ln + 2, "@szLeft@}")
+        nlineCount = nlineCount + 2
+        SetBufIns (hbuf, ln + 1, strlen(szLeft)+4)
+    }
+    else
+    {
+        RetVal= CheckBlockBrace(hbuf)
+        if(RetVal.iCount != 0)
+        {
+            msg("Invalidated brace number")
+            stop
+        }
+        
+        szOld = strmid(szLine,0,sel.ichFirst)
+        if(sel.lnFirst != sel.lnLast)
+        {
+            szMid = strmid(szLine,sel.ichFirst,strlen(szLine))
+            szMid = TrimString(szMid)
+            szLast = GetBufLine(hbuf,sel.lnLast)
+            if( sel.ichLim > strlen(szLast) )
+            {
+                szLineselichLim = strlen(szLast)
+            }
+            else
+            {
+                szLineselichLim = sel.ichLim
+            }
+            
+            szRight = strmid(szLast,szLineselichLim,strlen(szLast))
+            szRight = TrimString(szRight)
+        }
+        else
+        {
+             if(sel.ichLim >= strlen(szLine))
+             {
+                 sel.ichLim = strlen(szLine)
+             }
+             
+             szMid = strmid(szLine,sel.ichFirst,sel.ichLim)
+             szMid = TrimString(szMid)            
+             if( sel.ichLim > strlen(szLine) )
+             {
+                 szLineselichLim = strlen(szLine)
+             }
+             else
+             {
+                 szLineselichLim = sel.ichLim
+             }
+             
+             szRight = strmid(szLine,szLineselichLim,strlen(szLine))
+             szRight = TrimString(szRight)
+        }
+        nIdx = sel.lnFirst
+        while( nIdx < sel.lnLast)
+        {
+            szCurLine = GetBufLine(hbuf,nIdx+1)
+            if( sel.ichLim > strlen(szCurLine) )
+            {
+                szLineselichLim = strlen(szCurLine)
+            }
+            else
+            {
+                szLineselichLim = sel.ichLim
+            }
+            szCurLine = cat("    ",szCurLine)
+            if(nIdx == sel.lnLast - 1)
+            {
+                szCurLine = strmid(szCurLine,0,szLineselichLim + 4)
+                PutBufLine(hbuf,nIdx+1,szCurLine)                    
+            }
+            else
+            {
+                PutBufLine(hbuf,nIdx+1,szCurLine)
+            }
+            nIdx = nIdx + 1
+        }
+        if(strlen(szRight) != 0)
+        {
+            InsBufLine(hbuf, sel.lnLast + 1, "@szLeft@@szRight@")        
+        }
+        InsBufLine(hbuf, sel.lnLast + 1, "@szLeft@}")        
+        nlineCount = nlineCount + 1
+        if(nLeft < sel.ichFirst)
+        {
+            PutBufLine(hbuf,ln,szOld)
+            InsBufLine(hbuf, ln+1, "@szLeft@{")
+            nlineCount = nlineCount + 1
+            ln = ln + 1
+        }
+        else
+        {
+            DelBufLine(hbuf,ln)
+            InsBufLine(hbuf, ln, "@szLeft@{")
+        }
+        if(strlen(szMid) > 0)
+        {
+            InsBufLine(hbuf, ln+1, "@szLeft@    @szMid@")
+            nlineCount = nlineCount + 1
+            ln = ln + 1
+        }        
+    }
+    retVal.szLeft = szLeft
+    retVal.nLineCount = nlineCount
+    return retVal
+}
+
+/*************************************************
+  Function: 	GetLeftBlank
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro GetLeftBlank(szLine)
+{
+    nIdx = 0
+    nEndIdx = strlen(szLine)
+    while( nIdx < nEndIdx )
+    {
+        if( (szLine[nIdx] !=" ") && (szLine[nIdx] !="\t"))
+        {
+            break;
+        }
+        nIdx = nIdx + 1   
+    }
+    
+    return nIdx
+}
+
+/*************************************************
+  Function: 	ExpandBraceLittle
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro ExpandBraceLittle()
+{
+    hwnd = GetCurrentWnd()
+    sel = GetWndSel(hwnd)
+    hbuf = GetCurrentBuf()
+    if( (sel.lnFirst == sel.lnLast) 
+        && (sel.ichFirst == sel.ichLim) )
+    {
+        SetBufSelText (hbuf, "(  )")
+        SetBufIns (hbuf, sel.lnFirst, sel.ichFirst + 2)    
+    }
+    else
+    {
+        SetBufIns (hbuf, sel.lnFirst, sel.ichFirst)    
+        SetBufSelText (hbuf, "( ")
+        SetBufIns (hbuf, sel.lnLast, sel.ichLim + 2)    
+        SetBufSelText (hbuf, " )")
+    }
+    
+}
+
+/*************************************************
+  Function: 	ExpandBraceMid
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro ExpandBraceMid()
+{
+    hwnd = GetCurrentWnd()
+    sel = GetWndSel(hwnd)
+    hbuf = GetCurrentBuf()
+    if( (sel.lnFirst == sel.lnLast) 
+        && (sel.ichFirst == sel.ichLim) )
+    {
+        SetBufSelText (hbuf, "[]")
+        SetBufIns (hbuf, sel.lnFirst, sel.ichFirst + 1)    
+    }
+    else
+    {
+        SetBufIns (hbuf, sel.lnFirst, sel.ichFirst)    
+        SetBufSelText (hbuf, "[")
+        SetBufIns (hbuf, sel.lnLast, sel.ichLim + 1)    
+        SetBufSelText (hbuf, "]")
+    }
+}
+
+/*************************************************
   Function: IfdefSz
   Description:
   Input:
@@ -297,7 +695,7 @@ macro GetWordFromString(hbuf,szLine,nBeg,nEnd,chBeg,chSeparator,chEnd)
 macro IfdefSz(sz)
 {
     ProgEnvInfo = GetProgramEnvironmentInfo ()
-    Editor = GetAuthorbySelf()
+    Editor = GetAuthor()
  
     hwnd = GetCurrentWnd()
     lnFirst = GetWndSelLnFirst(hwnd)
@@ -324,7 +722,7 @@ macro IfdefSz(sz)
 macro IfndefSz(sz)
 {
     ProgEnvInfo = GetProgramEnvironmentInfo ()
-    Editor = GetAuthorbySelf()
+    Editor = GetAuthor()
  
     hwnd = GetCurrentWnd()
     lnFirst = GetWndSelLnFirst(hwnd)
@@ -402,13 +800,14 @@ macro FileHeaderEN(hbuf, ln, FileName, Author)
 {
 	lnFirst = ln
 	LocalTime = GetSysTime(1)
-    Year = LocalTime.Year+3
+    Year = LocalTime.Year
+    YearNext = LocalTime.Year+3
     YearLast = LocalTime.Year-3
     Month = LocalTime.Month
     Day = LocalTime.Day
     
 	InsBufLine(hbuf, lnFirst++, "/*********************************************************")
-    InsBufLine(hbuf, lnFirst++, " Copyright (C),@YearLast@-@Year@,Electronic Technology Co.,Ltd.")
+    InsBufLine(hbuf, lnFirst++, " Copyright (C),@YearLast@-@YearNext@,Electronic Technology Co.,Ltd.")
     InsBufLine(hbuf, lnFirst++, " File name: 		@FileName@")
     InsBufLine(hbuf, lnFirst++, " Author: 			@Author@")
     InsBufLine(hbuf, lnFirst++, " Version: 			1.0")
@@ -418,8 +817,8 @@ macro FileHeaderEN(hbuf, ln, FileName, Author)
     InsBufLine(hbuf, lnFirst++, " 					")
     InsBufLine(hbuf, lnFirst++, "   1.Date:	 		@Year@-@Month@-@Day@")
     InsBufLine(hbuf, lnFirst++, " 	 Author:	 	@Author@")
-    InsBufLine(hbuf, lnFirst++, " 	 Modification:  Created file")   
- 	InsBufLine(hbuf, lnFirst++, "   2. ... ")
+    InsBufLine(hbuf, lnFirst++, " 	 Modification:  Created file")  
+    InsBufLine(hbuf, lnFirst++, " 	 ")       
     InsBufLine(hbuf, lnFirst++, "*********************************************************/")
     SetBufIns (hbuf, lnFirst,0)
 }
@@ -436,13 +835,14 @@ macro FileHeaderCN(hbuf, ln, FileName, Author)
 {
 	lnFirst = ln
 	LocalTime = GetSysTime(1)
-    Year = LocalTime.Year+3
+    Year = LocalTime.Year
+    YearNext = LocalTime.Year+3
     YearLast = LocalTime.Year-3
     Month = LocalTime.Month
     Day = LocalTime.Day
     
 	InsBufLine(hbuf, lnFirst++, "/*********************************************************")
-    InsBufLine(hbuf, lnFirst++, " 版权所有 (C),@YearLast@-@Year@ ")
+    InsBufLine(hbuf, lnFirst++, " 版权所有 (C),@YearLast@-@YearNext@ ")
     InsBufLine(hbuf, lnFirst++, " 文 件 名: 			@FileName@")
     InsBufLine(hbuf, lnFirst++, " 作    者: 			@Author@")
     InsBufLine(hbuf, lnFirst++, " 版 本 号: 			1.0")
@@ -453,7 +853,7 @@ macro FileHeaderCN(hbuf, ln, FileName, Author)
     InsBufLine(hbuf, lnFirst++, "   1.日    期:	 	@Year@-@Month@-@Day@")
     InsBufLine(hbuf, lnFirst++, " 	 作    者:	 	@Author@")
     InsBufLine(hbuf, lnFirst++, " 	 修改内容:  	创建文件")   
- 	InsBufLine(hbuf, lnFirst++, "   2. ... ")
+    InsBufLine(hbuf, lnFirst++, " 	 ")   
     InsBufLine(hbuf, lnFirst++, "*********************************************************/")
     SetBufIns (hbuf, lnFirst,0)
 }
@@ -466,7 +866,7 @@ macro FileHeaderCN(hbuf, ln, FileName, Author)
   Return:
   Others:
 *************************************************/
-macro HistoryContentEN(hbuf,ln,Author)
+macro HistoryContentEN(hbuf,ln,Index,Author)
 {
     SysTime = GetSysTime(1);
     szTime = SysTime.Date
@@ -474,10 +874,34 @@ macro HistoryContentEN(hbuf,ln,Author)
     Month = SysTime.month
     Day = SysTime.day
 
-    InsBufLine(hbuf, ln++, "   1.Date:	 		@Year@-@Month@-@Day@")
+    InsBufLine(hbuf, ln++, "   @Index@.Date:	 		@Year@-@Month@-@Day@")
     InsBufLine(hbuf, ln++, " 	 Author:	 	@Author@")
     szContent = Ask("Please input modification")
     InsBufLine(hbuf, ln++, " 	 Modification:  @szContent@")   
+    InsBufLine(hbuf, ln++, " 	 ")   
+}
+
+/*************************************************
+  Function: 	HistoryContentCN
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro HistoryContentCN(hbuf,ln,Index,Author)
+{
+    SysTime = GetSysTime(1);
+    szTime = SysTime.Date
+    Year = SysTime.Year
+    Month = SysTime.month
+    Day = SysTime.day
+
+    InsBufLine(hbuf, ln++, "   @Index@.日    期:	 	@Year@-@Month@-@Day@")
+    InsBufLine(hbuf, ln++, " 	 作    者:	 	@Author@")
+    szContent = Ask("Please input modification")
+    InsBufLine(hbuf, ln++, " 	 修改内容:  	@szContent@")     
+    InsBufLine(hbuf, ln++, " 	 ")   
 }
 
 /*************************************************
@@ -618,6 +1042,7 @@ macro FuncHeadCommentEN(hbuf, ln, szFunc)
 {
     iIns = 0
 	symbol = GetSymbolLocationFromLn(hbuf, ln)
+
     if(strlen(symbol) > 0)
     {
         hTmpBuf = NewBuf("Tempbuf")
@@ -695,6 +1120,135 @@ macro FuncHeadCommentEN(hbuf, ln, szFunc)
     InsBufLine(hbuf, ln++, "*************************************************/")
 }
 
+/*************************************************
+  Function: 	InsertMultiCaseProc
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro InsertMultiCaseProc(hbuf,szLeft,nSwitch)
+{
+    hwnd = GetCurrentWnd()
+    sel = GetWndSel(hwnd)
+    ln = sel.lnFirst
+
+    nIdx = 0
+    if(nSwitch == 0)
+    {
+        hNewBuf = newbuf("clip")
+        if(hNewBuf == hNil)
+            return       
+        SetCurrentBuf(hNewBuf)
+        PasteBufLine (hNewBuf, 0)
+        nLeftMax = 0
+        lnMax = GetBufLineCount(hNewBuf)
+        i = 0
+        fIsEnd = 1
+        while ( i < lnMax) 
+        {
+            szLine = GetBufLine(hNewBuf , i)
+            RetVal = SkipCommentFromString(szLine,fIsEnd)
+            szLine = RetVal.szContent
+            fIsEnd = RetVal.fIsEnd
+            szLine = GetSwitchVar(szLine)
+            if(strlen(szLine) != 0 )
+            {
+                ln = ln + 4
+                InsBufLine(hbuf, ln - 1, "@szLeft@    " # "case @szLine@:")
+                InsBufLine(hbuf, ln    , "@szLeft@    " # "    ")
+                InsBufLine(hbuf, ln + 1, "@szLeft@    " # "    " # "break;")
+                InsBufLine(hbuf, ln + 2, "@szLeft@    ")
+              }
+              i = i + 1
+        }
+        closebuf(hNewBuf)
+       }
+       else
+       {
+        while(nIdx < nSwitch)
+        {
+            ln = ln + 4
+            InsBufLine(hbuf, ln - 1, "@szLeft@    " # "case #:")
+            InsBufLine(hbuf, ln    , "@szLeft@    " # "    ")
+            InsBufLine(hbuf, ln + 1, "@szLeft@    " # "    " # "break;")
+            InsBufLine(hbuf, ln + 2, "@szLeft@    ")
+            nIdx = nIdx + 1
+        }
+      }
+    InsBufLine(hbuf, ln + 2, "@szLeft@    ")  
+    InsBufLine(hbuf, ln + 3, "@szLeft@    " # "default:")
+    InsBufLine(hbuf, ln + 4, "@szLeft@    " # "    ")
+    InsBufLine(hbuf, ln + 5, "@szLeft@    " # "    " # "break;")
+    InsBufLine(hbuf, ln + 6, "@szLeft@" # "}")
+    SearchForward()
+}
+
+/*************************************************
+  Function: 	GetSwitchVar
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro GetSwitchVar(szLine)
+{
+    if( (szLine == "{") || (szLine == "}") )
+    {
+        return ""
+    }
+    ret = strstr(szLine,"#define" )
+    if(ret != 0xffffffff)
+    {
+        szLine = strmid(szLine,ret + 8,strlen(szLine))
+    }
+    szLine = TrimLeft(szLine)
+    nIdx = 0
+    nLen = strlen(szLine)
+    while( nIdx < nLen)
+    {
+        if((szLine[nIdx] == " ") || (szLine[nIdx] == ",") || (szLine[nIdx] == "="))
+        {
+            szLine = strmid(szLine,0,nIdx)
+            return szLine
+        }
+        nIdx = nIdx + 1
+    }
+    return szLine
+}
+
+/*************************************************
+  Function: InsertIfdef
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro InsertIfdef()
+{
+    sz = Ask("Enter ifdef condition:")
+    if (sz != "")
+        IfdefSz(sz);
+}
+
+/*************************************************
+  Function: InsertIfndef
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro InsertIfndef()
+{
+    sz = Ask("Enter ifdnef condition:")
+    if (sz != "")
+        IfndefSz(sz);
+}
+
 
 /*********************************************************/
 /*						输入函数						 */	
@@ -722,15 +1276,217 @@ macro InsertWhile()
     }
     val = ExpandBraceLarge()
     szLeft = val.szLeft
-    InsBufLine(hbuf, ln, "@szLeft@while ( # )")    
+    InsBufLine(hbuf, ln, "@szLeft@while (#)")    
     if(sel.lnFirst == sel.lnLast && sel.ichFirst == sel.ichLim)
     {
-        PutBufLine(hbuf,ln+2, "@szLeft@    #")
+        PutBufLine(hbuf,ln+2, "@szLeft@    ")
     }
-    SetBufIns (hbuf, ln, strlen(szLeft)+7)
+    SetBufIns (hbuf, ln, strlen(szLeft)+6)
     SearchForward()
 }
 
+/*************************************************
+  Function: 	InsertDo
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro InsertDo()
+{
+    hwnd = GetCurrentWnd()
+    sel = GetWndSel(hwnd)
+    hbuf = GetCurrentBuf()
+    ln = sel.lnFirst
+    if(sel.lnFirst == sel.lnLast && sel.ichFirst == sel.ichLim)
+    {
+        szLeft = CreateBlankString(sel.ichFirst)
+        InsBufLine(hbuf, ln,szLeft)
+        SetWndSel(hwnd,sel)
+    }
+    val = ExpandBraceLarge()
+    szLeft = val.szLeft
+    if(sel.lnFirst == sel.lnLast && sel.ichFirst == sel.ichLim)
+    {
+        PutBufLine(hbuf,ln+1, "@szLeft@    ")
+    }
+    PutBufLine(hbuf, sel.lnLast + val.nLineCount, "@szLeft@}while(#);")    
+    InsBufLine(hbuf, ln, "@szLeft@do")    
+    SearchForward()
+}
+
+
+/*************************************************
+  Function: 	InsertFor
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro InsertFor()
+{
+    hwnd = GetCurrentWnd()
+    sel = GetWndSel(hwnd)
+    hbuf = GetCurrentBuf()
+    ln = sel.lnFirst
+    if(sel.lnFirst == sel.lnLast && sel.ichFirst == sel.ichLim)
+    {
+        szLeft = CreateBlankString(sel.ichFirst)
+        InsBufLine(hbuf, ln,szLeft)
+        SetWndSel(hwnd,sel)
+    }
+    val = ExpandBraceLarge()
+    szLeft = val.szLeft
+    InsBufLine(hbuf, ln,"@szLeft@for (# ; # ; #)")
+    if(sel.lnFirst == sel.lnLast && sel.ichFirst == sel.ichLim)
+    {
+       PutBufLine(hbuf,ln+2, "@szLeft@    ")
+    }
+    sel.lnFirst = ln
+    sel.lnLast = ln 
+    sel.ichFirst = 0
+    sel.ichLim = 0
+    SetWndSel(hwnd, sel)
+    SearchForward()
+    szVar = ask("请输入循环参数")
+    szDir = ask("请输入循环方式(+/-)")
+    if("-" == szDir)
+    {
+    	PutBufLine(hbuf,ln, "@szLeft@for (@szVar@ = # ; @szVar@ > 0 ; @szVar@--)")
+    }
+    else
+     {
+    	PutBufLine(hbuf,ln, "@szLeft@for (@szVar@ = 0 ; @szVar@ < #; @szVar@++)")
+    }
+    SearchForward()
+}
+
+/*************************************************
+  Function: 	InsertSwitch
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro InsertSwitch()
+{
+    hwnd = GetCurrentWnd()
+    sel = GetWndSel(hwnd)
+    hbuf = GetCurrentBuf()
+    ln = sel.lnFirst
+    szLine = GetBufLine( hbuf, ln )    
+    nLeft = GetLeftBlank(szLine)
+    szLeft = strmid(szLine,0,nLeft);
+    InsBufLine(hbuf, ln, "@szLeft@switch(#)")    
+    InsBufLine(hbuf, ln + 1, "@szLeft@" # "{")
+    nSwitch = ask("请输入case的个数")
+    InsertMultiCaseProc(hbuf,szLeft,nSwitch)
+    SearchForward()    
+}
+
+/*************************************************
+  Function: 	InsertIf
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro InsertIf()
+{
+    hwnd = GetCurrentWnd()
+    sel = GetWndSel(hwnd)
+    hbuf = GetCurrentBuf()
+    ln = sel.lnFirst
+    if(sel.lnFirst == sel.lnLast && sel.ichFirst == sel.ichLim)
+    {
+        szLeft = CreateBlankString(sel.ichFirst)
+        InsBufLine(hbuf, ln,szLeft)
+        SetWndSel(hwnd,sel)
+    }
+    val = ExpandBraceLarge()
+    szLeft = val.szLeft
+    InsBufLine(hbuf, ln, "@szLeft@if (#)")    
+    if(sel.lnFirst == sel.lnLast && sel.ichFirst == sel.ichLim)
+    {
+        PutBufLine(hbuf,ln+2, "@szLeft@    ")
+    }
+    SetBufIns (hbuf, ln, strlen(szLeft)+3)
+    SearchForward()
+}
+
+/*************************************************
+  Function: 	InsertElse
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro InsertElse()
+{
+    hwnd = GetCurrentWnd()
+    sel = GetWndSel(hwnd)
+    hbuf = GetCurrentBuf()
+    ln = sel.lnFirst
+    if(sel.lnFirst == sel.lnLast && sel.ichFirst == sel.ichLim)
+    {
+        szLeft = CreateBlankString(sel.ichFirst)
+        InsBufLine(hbuf, ln,szLeft)
+        SetWndSel(hwnd,sel)
+    }
+    val = ExpandBraceLarge()
+    szLeft = val.szLeft
+    InsBufLine(hbuf, ln, "@szLeft@else")    
+    if(sel.lnFirst == sel.lnLast && sel.ichFirst == sel.ichLim)
+    {
+        PutBufLine(hbuf,ln+2, "@szLeft@    ")
+        SetBufIns (hbuf, ln+2, strlen(szLeft)+4)
+        return
+    }
+    SetBufIns (hbuf, ln, strlen(szLeft)+7)
+}
+
+/*************************************************
+  Function: 	InsertDefType
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro InsertDefType()
+{   
+    hwnd = GetCurrentWnd()
+    sel = GetWndSel(hwnd)
+    hbuf = GetCurrentBuf()
+    ln = sel.lnFirst
+    
+    szCmd = Ask("Please input typedef name(s/e)")
+    if (szCmd == "s")
+    {
+        DelBufLine(hbuf, ln)
+        szStructName = toupper(Ask("Please input struct name"))
+        InsBufLine(hbuf, ln, "typedef struct _@szStructName@_");
+        InsBufLine(hbuf, ln + 1, "{");
+        InsBufLine(hbuf, ln + 2, "    ");
+        InsBufLine(hbuf, ln + 3, "}@szStructName@,*P@szStructName@;");
+        SetBufIns (hbuf, ln + 2, strlen(szLine))
+    }
+    else if (szCmd == "e")
+    {
+        DelBufLine(hbuf, ln)
+        szStructName = toupper(Ask("Please input enum name"))
+        InsBufLine(hbuf, ln, "typedef enum");
+        InsBufLine(hbuf, ln + 1, "{");
+        InsBufLine(hbuf, ln + 2, "    ");
+        InsBufLine(hbuf, ln + 3, "}@szStructName@;");
+        SetBufIns (hbuf, ln + 2, strlen(szLine))
+    }
+}
 /*************************************************
   Function: 	RestoreCommand
   Description:
@@ -867,14 +1623,14 @@ macro InsertComment()
 }
 
 /*************************************************
-  Function: InsertIfbyTxl
-  Description: #if 0 / #endif
+  Function:     InsertIfComments
+  Description: 
   Input:
   Output:
   Return:
   Others:
 *************************************************/
-macro InsertIf()
+macro InsertIfComments()
 {
     ProgEnvInfo = GetProgramEnvironmentInfo ()
     Editor = GetAuthorbySelf()
@@ -891,6 +1647,27 @@ macro InsertIf()
     hbuf = GetCurrentBuf()
     InsBufLine(hbuf, lnFirst, "#if 0 /* Edit By @Editor@ @Year@-@Month@-@Day@ */")
     InsBufLine(hbuf, lnLast+2, "#endif")
+}
+
+/*************************************************
+  Function: Insertdef
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro Insertdef()
+{
+    sz = Ask("Enter Comment(n/other):")
+    if (sz == "n")
+    {
+        InsertIfndef()
+    }    
+    else
+    {
+        InsertIfdef()
+    }
 }
 
 /*************************************************
@@ -942,35 +1719,6 @@ macro InsertMoreLineComments()
 
 }
 
-/*************************************************
-  Function: InsertIfdefbyTxl
-  Description:
-  Input:
-  Output:
-  Return:
-  Others:
-*************************************************/
-macro InsertIfdef()
-{
-    sz = Ask("Enter ifdef condition:")
-    if (sz != "")
-        IfdefSz(sz);
-}
-
-/*************************************************
-  Function: InsertIfndef
-  Description:
-  Input:
-  Output:
-  Return:
-  Others:
-*************************************************/
-macro InsertIfndef()
-{
-    sz = Ask("Enter ifdnef condition:")
-    if (sz != "")
-        IfndefSz(sz);
-}
 
 /*************************************************
   Function: InsertFunctionHeaderbyTxl
@@ -1104,6 +1852,55 @@ macro InsertFileHeader()
         InsBufLine(hbuf,lnFirst++,"#endif /* ifndef @szDef@ Edit By @Author@ @Year@-@Month@-@Day@ */")
     }
     SaveBuf (hbuf)
+}
+
+/*************************************************
+  Function: 	InsertHistory
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro InsertHistory()
+{
+    Max = 1000
+    hbuf = GetCurrentBuf()
+    Author = GetAuthor()
+
+    ln = 0;
+    szCurLine = GetBufLine(hbuf, ln);
+    iBeg = strstr(szCurLine,"/*********************************************************")
+    if(iBeg == 0xffffffff)
+    {
+        msg "FileHead Format Error"
+        return 
+    }
+    
+    i = 0
+    while(Max > 0)
+    {
+        szCurLine = GetBufLine(hbuf, ln+i);
+        iBeg = strstr(szCurLine,"*********************************************************/")
+        if(iBeg != 0xffffffff)
+        {
+            break
+        }
+        i = i + 1
+        Max = Max - 1
+    }
+
+    Index = (i-9)/4+1
+    
+    if(GetLauguage() == 0)
+    {
+        HistoryContentCN(hbuf,i,Index,Author)
+    }
+    else
+    {
+        HistoryContentEN(hbuf,i,Index,Author)
+    }
+
 }
 
 /*************************************************
