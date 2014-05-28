@@ -463,6 +463,25 @@ macro SearchBackward()
 }
 
 /*************************************************
+  Function: 	SearchForwardLine2
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro SearchForwardLine2()
+{
+    //LoadSearchPattern("#", 1, 0, 1);
+    Search_Forward
+    Search_Forward
+    Search_Forward
+    Search_Forward
+    Search_Forward
+    Search_Forward
+}
+
+/*************************************************
   Function: 	ExpandBraceLarge
   Description:
   Input:
@@ -478,16 +497,23 @@ macro ExpandBraceLarge()
     ln = sel.lnFirst
     nlineCount = 0
     retVal = ""
-    szLine = GetBufLine( hbuf, ln ) 
+    retLine = ""
+    szLine = GetBufLine(hbuf, ln) 
 
     nLeft = GetLeftBlank(szLine)
+    len = strlen(szLine)
     szLeft = strmid(szLine,0,nLeft);
-
+    
+    if(szLeft == "")
+    {
+        szLeft = "    "
+        retLine = szLeft
+    }
     if(sel.lnFirst == sel.lnLast && sel.ichFirst == sel.ichLim)
     {
         if( nLeft == strlen(szLine) )
         {
-            SetBufSelText (hbuf, "{")
+            SetBufSelText (hbuf, "@retLine@{")
         }
         else
         {    
@@ -692,6 +718,54 @@ macro ExpandBraceMid()
   Return:
   Others:
 *************************************************/
+macro GetWordLeftOfIch(ich, sz)
+{
+    wordinfo = "" 
+    chTab = CharFromAscii(9)
+    
+    ich = ich - 1;
+    if (ich >= 0)
+    {    
+        while (sz[ich] == " " || sz[ich] == chTab)
+        {
+            ich = ich - 1;
+            if (ich < 0)
+                break;
+        }
+    }
+
+    ichLim = ich + 1;
+    asciiA = AsciiFromChar("A")
+    asciiZ = AsciiFromChar("Z")
+    while (ich >= 0)
+    {
+        ch = toupper(sz[ich])
+        asciiCh = AsciiFromChar(ch)
+        
+        if ((asciiCh < asciiA || asciiCh > asciiZ) 
+           && !IsNumber(ch)
+           && ( ch != "#" && ch != "{" && ch != "/" && ch != "*"))
+            break;
+
+        ich = ich - 1;
+    }
+    
+    ich = ich + 1
+    wordinfo.szWord = strmid(sz, ich, ichLim)
+    wordinfo.ich = ich
+    wordinfo.ichLim = ichLim;
+    
+    return wordinfo
+}
+
+/*************************************************
+  Function: IfdefSz
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
 macro IfdefSz(sz)
 {
     ProgEnvInfo = GetProgramEnvironmentInfo ()
@@ -749,7 +823,7 @@ macro IfndefSz(sz)
 macro CommentSz(sz)
 {
  	ProgEnvInfo = GetProgramEnvironmentInfo ()
-    Editor = GetAuthorbySelf()
+    Editor = GetAuthor()
  
     LocalTime = GetSysTime(1)
  
@@ -1086,7 +1160,10 @@ macro FuncHeadCommentEN(hbuf, ln, szFunc)
         {
         	break
         }
-        InsBufLine(hbuf, ln++, " Input: ")
+        if (i == 0)
+        {
+            InsBufLine(hbuf, ln++, " Input: ")
+        }
 		param = ""
 		j = 0;
 		k = 0;
@@ -1409,7 +1486,7 @@ macro InsertIf()
     }
     val = ExpandBraceLarge()
     szLeft = val.szLeft
-    InsBufLine(hbuf, ln, "@szLeft@if (#)")    
+    InsBufLine(hbuf, ln, "@szLeft@if(#)")    
     if(sel.lnFirst == sel.lnLast && sel.ichFirst == sel.ichLim)
     {
         PutBufLine(hbuf,ln+2, "@szLeft@    ")
@@ -1448,6 +1525,47 @@ macro InsertElse()
         return
     }
     SetBufIns (hbuf, ln, strlen(szLeft)+7)
+}
+
+/*************************************************
+  Function: 	InsertIfElse
+  Description:
+  Input:
+  Output:
+  Return:
+  Others:
+*************************************************/
+macro InsertIfElse()
+{
+    hwnd = GetCurrentWnd()
+    sel = GetWndSel(hwnd)
+    hbuf = GetCurrentBuf()
+    ln = sel.lnFirst
+    if(sel.lnFirst == sel.lnLast && sel.ichFirst == sel.ichLim)
+    {
+        szLeft = CreateBlankString(sel.ichFirst)
+        InsBufLine(hbuf, ln,szLeft)
+        SetWndSel(hwnd,sel)
+    }
+    val = ExpandBraceLarge()
+    szLeft = val.szLeft
+    InsBufLine(hbuf, ln, "@szLeft@if (#)")    
+    if(sel.lnFirst == sel.lnLast && sel.ichFirst == sel.ichLim)
+    {
+        PutBufLine(hbuf,ln+2, "@szLeft@    ")
+    }
+    SetBufIns (hbuf, ln, strlen(szLeft)+3)
+    
+    val = ExpandBraceLarge()
+    szLeft = val.szLeft
+    InsBufLine(hbuf, ln+4, "@szLeft@else")    
+    if(sel.lnFirst == sel.lnLast && sel.ichFirst == sel.ichLim)
+    {
+        PutBufLine(hbuf,ln+6, "@szLeft@    ")
+        SetBufIns (hbuf, ln+6, strlen(szLeft)+4)
+        return
+    }
+    SetBufIns(hbuf, ln+4, strlen(szLeft)+7)
 }
 
 /*************************************************
@@ -1518,42 +1636,6 @@ macro RestoreCommand(hbuf,szCmd)
         szCmd = "config"
     }
     return szCmd
-}
-
-/*************************************************
-  Function: 	WriteCommandProc
-  Description:
-  Input:
-  Output:
-  Return:
-  Others:
-*************************************************/
-macro WriteCommandProc()
-{
-    hwnd = GetCurrentWnd()
-    if (hwnd == 0)
-        stop
-    sel = GetWndSel(hwnd)
-    hbuf = GetWndBuf(hwnd)
-    if(sel.lnFirst > 0)
-    {
-        ln = sel.lnFirst - 1
-    }
-    else
-    {
-        stop
-    }
-    szLine = GetBufLine(hbuf,ln)
-    szLine = TrimString(szLine)
-    Cmd = RestoreCommand(hbuf,szLine)
-    if(Cmd == "while")
-    {
-        InsertWhile()  
-    }
-
-    DelBufLine(hbuf,ln)
-    SearchForward()
-    stop
 }
 
 /*************************************************
@@ -1633,7 +1715,7 @@ macro InsertComment()
 macro InsertIfComments()
 {
     ProgEnvInfo = GetProgramEnvironmentInfo ()
-    Editor = GetAuthorbySelf()
+    Editor = GetAuthor()
  
     hwnd = GetCurrentWnd()
     lnFirst = GetWndSelLnFirst(hwnd)
@@ -1927,19 +2009,6 @@ macro ConfigureSystem()
 }
 
 /*************************************************
-  Function: 	NewFile
-  Description:
-  Input:
-  Output:
-  Return:
-  Others:
-*************************************************/
-macro NewFile()
-{
-
-}
-
-/*************************************************
   Function: 	ShowCmdMsg
   Description:
   Input:
@@ -1963,7 +2032,7 @@ macro ShowCmdMsg()
     
 	hbuf = GetCurrentBuf()
 	LogLine1 = "                       Please Input Command:                                  "
-	LogCmd = "   eg: config(co) new(n)"
+	LogCmd = "   eg: config(co)"
 	Log = cat(LogLine1,LogCmd)
 	StartMsg(Log)
 
@@ -1975,10 +2044,6 @@ macro ShowCmdMsg()
     if (NewCmd == "config")
     {
     	ConfigureSystem()
-    }
-    else if(NewCmd == "new")
-    {
-    	NewFile()
     }
     else
     {
